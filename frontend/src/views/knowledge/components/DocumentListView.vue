@@ -733,7 +733,6 @@ const handleAction = (action: 'edit' | 'reparse' | 'cancel-parse' | 'move' | 'de
   }
 }
 
-<<<<<<< HEAD
 .row-menu {
   display: flex;
   flex-direction: column;
