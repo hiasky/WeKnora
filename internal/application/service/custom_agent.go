@@ -529,9 +529,6 @@ func (s *customAgentService) getSuggestedQuestions(
 		if suggestionConfig == nil || !suggestionConfig.Starters.Enabled {
 			return []types.SuggestedQuestion{}, nil
 		}
-		if limit > suggestionConfig.Starters.Count {
-			limit = suggestionConfig.Starters.Count
-		}
 		starterMode = suggestionConfig.Starters.Mode
 		// Add curated agent prompts first (highest priority).
 		if suggestionConfig.Starters.Mode == types.SuggestionModeCurated ||
