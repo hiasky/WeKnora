@@ -4147,6 +4147,7 @@ export default {
       getFailed: 'Failed to get model',
       updateFailed: 'Failed to update model',
       deleteFailed: 'Failed to delete model',
+      setDefaultFailed: 'Failed to set default model',
     },
     tenant: {
       listFailed: 'Failed to list workspaces',
@@ -4810,7 +4811,8 @@ export default {
     actions: {
       addModel: 'Add Model',
       debugModel: 'Model Test',
-      setDefault: 'Set as Default'
+      setDefault: 'Set as Default',
+      unsetDefault: 'Unset Default',
     },
     source: {
       remote: 'Remote',
@@ -4855,8 +4857,9 @@ export default {
       saveFailed: 'Failed to save model',
       deleted: 'Model deleted',
       deleteFailed: 'Failed to delete model',
-      setDefault: 'Set as default',
+      defaultSet: 'Set as default model',
       setDefaultFailed: 'Failed to set default model',
+      unsetDefaultHint: 'Set another model as default to unset the current one',
       builtinCannotEdit: 'Built-in models cannot be edited',
       builtinCannotDelete: 'Built-in models cannot be deleted',
       builtinCannotCopy: 'Built-in models cannot be copied',
@@ -4871,6 +4874,7 @@ export default {
       viewGuide: 'View Built-in Models Guide',
     },
     builtinTag: 'Built-in',
+    defaultTag: 'Default',
     confirmDelete: 'Delete model "{name}"?',
     debug: {
       title: 'Model Test',
