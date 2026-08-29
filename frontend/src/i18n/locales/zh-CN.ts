@@ -3999,7 +3999,8 @@ export default {
         'wiki.content_changed': '更新 Wiki 内容',
         'faq.import_started': '开始导入 FAQ',
         'faq.import_completed': '完成导入 FAQ',
-        'faq.import_failed': '导入 FAQ 失败'
+        'faq.import_failed': '导入 FAQ 失败',
+        'sandbox.command_executed': '执行沙箱命令'
       },
       detailFields: {
         task_id: '任务 ID',

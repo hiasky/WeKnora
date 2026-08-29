@@ -72,6 +72,7 @@ const KB_ACTIVITY_ACTION_LABELS_EN: Record<string, string> = {
   'faq.import_started': 'FAQ import started',
   'faq.import_completed': 'FAQ import completed',
   'faq.import_failed': 'FAQ import failed',
+  'sandbox.command_executed': 'Sandbox command executed',
 }
 
 const KB_ACTIVITY_OUTCOME_LABELS_EN: Record<string, string> = {

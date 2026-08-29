@@ -32,6 +32,7 @@ WeKnora-Chrome-Extension/
 # 日志 / 临时文件
 logs/
 tmp/
+.tmp/
 temp/
 *.log
 *.pid

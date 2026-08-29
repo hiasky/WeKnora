@@ -183,9 +183,10 @@ const (
 	AuditActionKBShareRemoved           AuditAction = "kb.share_removed"
 	AuditActionWikiContentChanged       AuditAction = "wiki.content_changed"
 
-	AuditActionFAQImportStarted   AuditAction = "faq.import_started"
-	AuditActionFAQImportCompleted AuditAction = "faq.import_completed"
-	AuditActionFAQImportFailed    AuditAction = "faq.import_failed"
+	AuditActionFAQImportStarted       AuditAction = "faq.import_started"
+	AuditActionFAQImportCompleted     AuditAction = "faq.import_completed"
+	AuditActionFAQImportFailed        AuditAction = "faq.import_failed"
+	AuditActionSandboxCommandExecuted AuditAction = "sandbox.command_executed"
 )
 
 // AuditOutcome separates asynchronous acceptance from terminal business

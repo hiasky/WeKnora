@@ -2646,7 +2646,8 @@ export default {
         'wiki.content_changed': 'Wiki content changed',
         'faq.import_started': 'FAQ import started',
         'faq.import_completed': 'FAQ import completed',
-        'faq.import_failed': 'FAQ import failed'
+        'faq.import_failed': 'FAQ import failed',
+        'sandbox.command_executed': 'Sandbox command executed'
       },
       outcomes: {
         accepted: 'Accepted',

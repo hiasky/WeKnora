@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -179,17 +180,46 @@ func (m *MessageAttachments) Scan(value interface{}) error {
 // identity used by ArtifactCollector to de-duplicate files across multi-turn
 // runs (see docs/superpowers/specs/2026-07-10-skill-artifact-download-design.md).
 type MessageArtifact struct {
-	URL        string    `json:"url"`         // Storage URL (provider://path); persisted, not sent to client
-	FileName   string    `json:"file_name"`   // Original filename inside the sandbox
-	FileType   string    `json:"file_type"`   // File extension (e.g., ".pptx", ".pdf")
-	FileSize   int64     `json:"file_size"`   // File size in bytes
-	SourcePath string    `json:"source_path"` // Absolute path inside the sandbox (used for diff)
-	ModTime    time.Time `json:"mod_time"`    // Sandbox-side modification time (used for diff)
-	CreatedAt  time.Time `json:"created_at"`  // When WeKnora persisted the blob
+	URL          string    `json:"url"`                     // Storage URL (provider://path); persisted, not sent to client
+	FileName     string    `json:"file_name"`               // Original filename inside the sandbox
+	FileType     string    `json:"file_type"`               // File extension (e.g., ".pptx", ".pdf")
+	ArtifactType string    `json:"artifact_type,omitempty"` // Stable renderer category
+	FileSize     int64     `json:"file_size"`               // File size in bytes
+	SourcePath   string    `json:"source_path"`             // Absolute path inside the sandbox (used for diff)
+	ModTime      time.Time `json:"mod_time"`                // Sandbox-side modification time (used for diff)
+	CreatedAt    time.Time `json:"created_at"`              // When WeKnora persisted the blob
 }
 
 // MessageArtifacts is a slice of MessageArtifact for database storage.
 type MessageArtifacts []MessageArtifact
+
+const (
+	ArtifactTypePresentation = "presentation"
+	ArtifactTypeWeb          = "web"
+	ArtifactTypeSpreadsheet  = "spreadsheet"
+	ArtifactTypeDocument     = "document"
+	ArtifactTypeImage        = "image"
+	ArtifactTypeOther        = "other"
+)
+
+// InferArtifactType maps a filename onto the stable renderer categories sent
+// to clients. Older persisted messages omit the marker and use this fallback.
+func InferArtifactType(name string) string {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".ppt", ".pptx", ".odp":
+		return ArtifactTypePresentation
+	case ".html", ".htm", ".mhtml":
+		return ArtifactTypeWeb
+	case ".csv", ".tsv", ".xls", ".xlsx", ".ods":
+		return ArtifactTypeSpreadsheet
+	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg":
+		return ArtifactTypeImage
+	case ".pdf", ".doc", ".docx", ".odt", ".md", ".txt":
+		return ArtifactTypeDocument
+	default:
+		return ArtifactTypeOther
+	}
+}
 
 // Value implements the driver.Valuer interface for database serialization
 func (m MessageArtifacts) Value() (driver.Value, error) {

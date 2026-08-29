@@ -94,6 +94,17 @@ func RegisterSessionRoutes(
 		sessions.GET("/:id/artifacts", handler.ListSessionArtifacts)
 		sessions.GET("/:id/messages/:message_id/artifacts", handler.ListMessageArtifacts)
 		sessions.GET("/:id/messages/:message_id/artifacts/:index/download", handler.DownloadMessageArtifact)
+
+		// Visual sandbox workbench. All mutations remain scoped to the current
+		// user's session and /workspace/output on the server side.
+		sessions.POST("/:session_id/workbench/commands", handler.StartWorkbenchCommand)
+		sessions.GET("/:id/workbench/commands/:command_id/events", handler.StreamWorkbenchCommand)
+		sessions.DELETE("/:id/workbench/commands/:command_id", handler.CancelWorkbenchCommand)
+		sessions.GET("/:id/workbench/files", handler.ListWorkbenchFiles)
+		sessions.POST("/:session_id/workbench/files/upload", handler.UploadWorkbenchFile)
+		sessions.GET("/:id/workbench/files/download", handler.DownloadWorkbenchFile)
+		sessions.PATCH("/:id/workbench/files", handler.RenameWorkbenchFile)
+		sessions.DELETE("/:id/workbench/files", handler.DeleteWorkbenchFile)
 	}
 }
 

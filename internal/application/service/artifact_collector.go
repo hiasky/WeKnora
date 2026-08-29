@@ -421,13 +421,14 @@ func (c *ArtifactCollector) maybePersist(
 	c.bindArtifactResource(ctx, storagePath, messageID)
 
 	return types.MessageArtifact{
-		URL:        storagePath,
-		FileName:   entry.Name,
-		FileType:   strings.ToLower(filepath.Ext(entry.Name)),
-		FileSize:   int64(len(data)),
-		SourcePath: entry.Path,
-		ModTime:    entry.ModTime,
-		CreatedAt:  time.Now().UTC(),
+		URL:          storagePath,
+		FileName:     entry.Name,
+		FileType:     strings.ToLower(filepath.Ext(entry.Name)),
+		ArtifactType: types.InferArtifactType(entry.Name),
+		FileSize:     int64(len(data)),
+		SourcePath:   entry.Path,
+		ModTime:      entry.ModTime,
+		CreatedAt:    time.Now().UTC(),
 	}, true
 }
 

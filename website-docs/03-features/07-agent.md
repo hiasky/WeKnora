@@ -392,7 +392,7 @@ description: Extract text and tables from PDF files, fill forms, merge documents
 
 | 位置 | 内容 | 用途 |
 | --- | --- | --- |
-| `skills/preloaded/` | `citation-generator`（引用生成器）、`data-processor`（数据处理器，含 analyze.py 等脚本）、`doc-coauthoring`（文档协作）、`document-analyzer`（文档分析器）、`openmaic-classroom`（互动课程生成） | 服务端预置技能，Agent 可勾选 |
+| `skills/preloaded/` | `citation-generator`（引用生成器）、`data-processor`（数据处理器，含 analyze.py 等脚本）、`doc-coauthoring`（文档协作）、`document-analyzer`（文档分析器）、`openmaic-classroom`（互动课程生成）、`presentation-generator`（PPTX 演示文稿生成） | 服务端预置技能，Agent 可勾选 |
 | `examples/skills/pdf-processing/` | SKILL.md + `scripts/analyze_form.py`、`scripts/extract_text.py` | 自定义技能示例 |
 | `cli/skills/` | `weknora-shared`、`weknora-rag-search`（经 `//go:embed` 打进 CLI 二进制，`weknora skills install` 释放） | 面向外部 Agent 使用 WeKnora CLI 的技能 |
 
@@ -409,6 +409,17 @@ Agent 侧的启停在 `configureSkillsFromAgent`（`internal/application/service
 ### 5.3 与沙箱（internal/sandbox）的关系
 
 `execute_skill_script` → `skills.Manager.ExecuteScript` → `sandbox.Manager.Execute`。Docker、CubeSandbox、E2B 均通过「设置 → 沙箱后端」的同一套空间配置与检查接口维护；远端模板从目标集群实时拉取，缺少 WeKnora 标准模板时自动创建。三者都是会话级持久沙箱，提供 shell_exec、附件暂存与产物收集。本机开发用 Docker 后端连本机 daemon；生产环境使用 E2B 协议后端：E2B Cloud、CubeSandbox，或任意 E2B 兼容控制面，接入方式见 `docs/sandbox-protocol.md`。
+
+### 5.4 可视化沙箱工作台
+
+网页对话标题菜单中的「沙箱工作台」复用当前会话已绑定的沙箱，不会新建宿主机进程，也不会因 Agent 后续切换配置而跳到另一个后端。工作台包含两个页签：
+
+- **终端**：输入命令后通过 SSE 查看 stdout/stderr 增量输出，可中断运行；工作目录仅允许 `/workspace` 下路径。每条命令受最长时限约束，并以 `sandbox.command_executed` 写入空间审计日志；
+- **文件**：仅浏览和修改 `/workspace/output`，支持上传、下载、重命名与删除。绝对路径、`..` 和 Windows 分隔符都会由服务端规范化后再次检查，目录外请求返回 400。
+
+接口位于 `/api/v1/sessions/:id/workbench` 下，沿用会话 Viewer/API Key chat capability、租户与 owner 校验。管理员对渠道会话的只读观察权限不会转化为工作台写权限。
+
+产物收集时会写入稳定的 `artifact_type`：`presentation`、`web`、`spreadsheet`、`document`、`image` 或 `other`。前端优先按该标记选渲染器，旧消息则按扩展名兼容推断。网页产物使用 `sandbox="allow-scripts"` 且不含 `allow-same-origin` 的 iframe，因此不能读取主站 DOM、Cookie 或登录状态。
 
 **Manager 与校验器**（`internal/sandbox/manager.go`、`validator.go`）：每次执行前，除非 `SkipValidation`，`ScriptValidator` 会做四类静态校验，任一命中即拒绝执行并返回 `ErrSecurityViolation`：
 

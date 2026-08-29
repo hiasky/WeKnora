@@ -65,6 +65,21 @@ type SessionFileStore interface {
 	RemoveSessionInputPath(ctx context.Context, sessionID, targetPath string) error
 }
 
+// SessionOutputFileStore is the opt-in mutation slice used by the visual
+// workbench. Keeping it separate preserves the read/staging capability for
+// implementations that intentionally cannot mutate generated artifacts.
+type SessionOutputFileStore interface {
+	WriteSessionOutputFile(ctx context.Context, sessionID, filePath string, content []byte) error
+	RemoveSessionOutputPath(ctx context.Context, sessionID, targetPath string) error
+}
+
+// SessionDirectoryLister exposes a single non-recursive directory listing for
+// interactive file browsers. Artifact collection keeps using the recursive
+// ListSessionFiles contract.
+type SessionDirectoryLister interface {
+	ListSessionDirectory(ctx context.Context, sessionID, dir string) ([]RemoteDirEntry, error)
+}
+
 // SessionCapabilityProvider is implemented by managers that MAY offer
 // session-scoped capabilities. Accessors return nil when the current
 // runtime configuration cannot support that capability. Application code

@@ -3997,7 +3997,8 @@ export default {
         'wiki.content_changed': 'Wiki 콘텐츠 업데이트',
         'faq.import_started': 'FAQ 가져오기 시작',
         'faq.import_completed': 'FAQ 가져오기 완료',
-        'faq.import_failed': 'FAQ 가져오기 실패'
+        'faq.import_failed': 'FAQ 가져오기 실패',
+        'sandbox.command_executed': '샌드박스 명령 실행'
       },
       detailFields: {
         task_id: '작업 ID',

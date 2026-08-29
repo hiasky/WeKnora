@@ -535,6 +535,67 @@ func (m *SessionBoundManager) RemoveSessionInputPath(
 	return nil
 }
 
+// WriteSessionOutputFile writes a workbench upload into the artifact tree.
+// It deliberately shares no general-purpose write primitive with callers.
+func (m *SessionBoundManager) WriteSessionOutputFile(
+	ctx context.Context, sessionID, filePath string, content []byte,
+) error {
+	if err := m.requireRemoteBackend(); err != nil {
+		return err
+	}
+	clean, err := cleanPathUnder(filePath, SessionOutputRoot)
+	if err != nil {
+		return err
+	}
+	handle, err := m.resolveSession(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	if err := ignoreExistingDir(m.client.MakeDir(ctx, handle, path.Dir(clean))); err != nil {
+		return fmt.Errorf("sandbox: create output directory: %w", err)
+	}
+	if err := m.client.WriteFile(ctx, handle, clean, content); err != nil {
+		return fmt.Errorf("sandbox: write session output %s: %w", clean, err)
+	}
+	return nil
+}
+
+// RemoveSessionOutputPath removes one file or directory under the artifact
+// tree without ever provisioning a sandbox just for deletion.
+func (m *SessionBoundManager) RemoveSessionOutputPath(
+	ctx context.Context, sessionID, targetPath string,
+) error {
+	if err := m.requireRemoteBackend(); err != nil {
+		return err
+	}
+	clean, err := cleanPathUnder(targetPath, SessionOutputRoot)
+	if err != nil {
+		return err
+	}
+	if clean == SessionOutputRoot {
+		return errors.New("sandbox: refusing to remove output root")
+	}
+	handle, ok, err := m.lookupSessionHandle(ctx, sessionID)
+	if err != nil || !ok {
+		return err
+	}
+	if err := m.client.Remove(ctx, handle, clean); err != nil {
+		return fmt.Errorf("sandbox: remove session output %s: %w", clean, err)
+	}
+	return nil
+}
+
+func cleanPathUnder(raw, root string) (string, error) {
+	clean := path.Clean(strings.TrimSpace(raw))
+	if !path.IsAbs(clean) {
+		clean = path.Join(root, clean)
+	}
+	if clean != root && !strings.HasPrefix(clean, root+"/") {
+		return "", fmt.Errorf("sandbox: path %q is outside %s", raw, root)
+	}
+	return clean, nil
+}
+
 // ListSessionFiles walks dir under the session's live sandbox recursively.
 // Returns nil (no error) when the session has no bound sandbox so callers can
 // treat "no sandbox" and "empty output" uniformly.
@@ -549,6 +610,30 @@ func (m *SessionBoundManager) ListSessionFiles(
 		return nil, err
 	}
 	return m.listFilesRecursive(ctx, handle, dir)
+}
+
+// ListSessionDirectory returns the immediate children of dir for an
+// interactive file browser. It never provisions a sandbox.
+func (m *SessionBoundManager) ListSessionDirectory(
+	ctx context.Context, sessionID, dir string,
+) ([]RemoteDirEntry, error) {
+	if strings.TrimSpace(dir) == "" {
+		return nil, errors.New("sandbox: dir required for ListSessionDirectory")
+	}
+	handle, ok, err := m.lookupSessionHandle(ctx, sessionID)
+	if err != nil || !ok {
+		return nil, err
+	}
+	entries, err := m.client.ListDir(ctx, handle, dir)
+	if err != nil {
+		return nil, err
+	}
+	for i := range entries {
+		if entries[i].Path == "" {
+			entries[i].Path = path.Join(dir, entries[i].Name)
+		}
+	}
+	return entries, nil
 }
 
 // StatSessionFile returns metadata for a single file without downloading

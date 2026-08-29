@@ -75,6 +75,10 @@
               <t-icon class="chat-header-menu__icon" name="browse" />
               <span>{{ t('chatHeader.openNewWindow') }}</span>
             </button>
+            <button type="button" class="chat-header-menu__item" @click="onMenuAction('workbench')">
+              <t-icon class="chat-header-menu__icon" name="code" />
+              <span>{{ t('chatHeader.sandboxWorkbench', '沙箱工作台') }}</span>
+            </button>
             <div class="chat-header-menu__divider" />
             <button type="button" class="chat-header-menu__item" @click="enterConfirmMode('clear')">
               <t-icon class="chat-header-menu__icon" name="clear" />
@@ -142,6 +146,7 @@ const props = defineProps<{
   session: ChatHeaderSession | null
   hasReferencesPanel?: boolean
 }>()
+const emit = defineEmits<{ (e: 'open-workbench'): void }>()
 
 const { t } = useI18n()
 const busyAction = ref('')
@@ -170,6 +175,11 @@ function backToMenu(): void {
 }
 
 function onMenuAction(value: string): void {
+	if (value === 'workbench') {
+		menuVisible.value = false
+		emit('open-workbench')
+		return
+	}
   if (value === 'rename') {
     menuVisible.value = false
     startTitleEdit()

@@ -3997,7 +3997,8 @@ export default {
         'wiki.content_changed': 'Содержимое Wiki обновлено',
         'faq.import_started': 'Импорт FAQ начат',
         'faq.import_completed': 'Импорт FAQ завершён',
-        'faq.import_failed': 'Ошибка импорта FAQ'
+        'faq.import_failed': 'Ошибка импорта FAQ',
+        'sandbox.command_executed': 'Выполнение команды песочницы'
       },
       detailFields: {
         task_id: 'ID задачи',

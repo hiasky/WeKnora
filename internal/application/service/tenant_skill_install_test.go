@@ -1016,6 +1016,21 @@ func TestRunInstallRequiresVenvWhenRequirementsExist(t *testing.T) {
 	require.Nil(t, fx.configRepo.saved)
 }
 
+func TestEnsureDeclaredDependencyTreesInstallsMissingPythonVenv(t *testing.T) {
+	fx := newInstallFixture(t)
+	fx.bundle.Files["requirements.txt"] = []byte("pypdf==4.0.0\n")
+	fx.depsExitCode = 1
+
+	err := fx.svc.ensureDeclaredDependencyTrees(
+		context.Background(), fx.sandboxMgr, "session-1", installSkillDir, fx.bundle,
+	)
+
+	require.NoError(t, err)
+	require.Contains(t, fx.commands,
+		"cd "+installSkillDir+
+			" && uv venv .venv && uv pip install --python .venv/bin/python -r requirements.txt")
+}
+
 // Verification used to run one guessed "entry script" with --help. Nothing in
 // the runtime designates an entry script — the model names whichever path it
 // likes in execute_skill_script — so the guess left every other file unchecked

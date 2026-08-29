@@ -241,6 +241,14 @@ const items = computed<ArtifactMeta[]>(() => {
 const previewFileType = computed(() => {
     const item = previewItem.value
     if (!item) return ''
+	// New messages carry a stable server-side renderer category. Preserve the
+	// concrete spreadsheet extension because CSV and XLSX need different parsers;
+	// old messages continue through extension inference below.
+	if (item.artifact_type === 'presentation') return 'pptx'
+	if (item.artifact_type === 'web') return 'html'
+	if (item.artifact_type === 'spreadsheet') {
+		return resolveFilePreviewExt(item.file_name, item.file_type)
+	}
     return resolveFilePreviewExt(item.file_name, item.file_type)
 })
 

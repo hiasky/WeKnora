@@ -1,4 +1,4 @@
-import { get, post, put, del, postChat, getDown } from "../../utils/request";
+import { get, post, put, del, patch, postChat, postUpload, getDown } from "../../utils/request";
 
 
 
@@ -100,10 +100,52 @@ export interface ArtifactMeta {
   handle?: string;
   file_name: string;
   file_type: string;
+  artifact_type?: 'presentation' | 'web' | 'spreadsheet' | 'document' | 'image' | 'other';
   file_size: number;
   source_path: string;
   mod_time: string;
   created_at: string;
+}
+
+export interface WorkbenchFileEntry {
+  name: string;
+  path: string;
+  is_dir: boolean;
+  size: number;
+  mod_time: string;
+}
+
+export async function startWorkbenchCommand(sessionId: string, command: string, workDir = '/workspace') {
+  return post(`/api/v1/sessions/${sessionId}/workbench/commands`, {
+    command, work_dir: workDir,
+  });
+}
+
+export async function cancelWorkbenchCommand(sessionId: string, commandId: string) {
+  return del(`/api/v1/sessions/${sessionId}/workbench/commands/${commandId}`);
+}
+
+export async function listWorkbenchFiles(sessionId: string, filePath = '/workspace/output') {
+  return get(`/api/v1/sessions/${sessionId}/workbench/files?path=${encodeURIComponent(filePath)}`);
+}
+
+export async function uploadWorkbenchFile(sessionId: string, directory: string, file: File) {
+  const form = new FormData();
+  form.append('path', directory);
+  form.append('file', file);
+  return postUpload(`/api/v1/sessions/${sessionId}/workbench/files/upload`, form);
+}
+
+export async function renameWorkbenchFile(sessionId: string, filePath: string, newName: string) {
+  return patch(`/api/v1/sessions/${sessionId}/workbench/files`, { path: filePath, new_name: newName });
+}
+
+export async function deleteWorkbenchFile(sessionId: string, filePath: string) {
+  return del(`/api/v1/sessions/${sessionId}/workbench/files?path=${encodeURIComponent(filePath)}`);
+}
+
+export async function downloadWorkbenchFile(sessionId: string, filePath: string): Promise<Blob> {
+  return getDown(`/api/v1/sessions/${sessionId}/workbench/files/download?path=${encodeURIComponent(filePath)}`);
 }
 
 // listMessageArtifacts returns the artifacts attached to a single assistant

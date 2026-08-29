@@ -349,6 +349,16 @@ func (s *TenantSkillService) runInstall(
 	}
 	s.publishProgress(ctx, tenantID, configID, skillID, SkillProgress{Percent: 80, Stage: "agent_done"})
 
+	// Some OpenAI-compatible models finish the installer conversation without
+	// issuing any shell_exec call. The transcript then looks successful, but no
+	// dependency tree exists and the structural verifier can only report a
+	// missing .venv/node_modules directory. Manifests are deterministic input;
+	// create a missing dependency tree here instead of making correctness depend
+	// on whether the selected model chose to call its tool.
+	if err := s.ensureDeclaredDependencyTrees(ctx, mgr, sess.ID, skillDir, bundle); err != nil {
+		return err
+	}
+
 	// 4. Hand the tree to the execution user BEFORE verifying it. The agent
 	//    created these files as root, and the language passes below
 	//    deliberately run as the ordinary user: verifying first would test
@@ -850,6 +860,46 @@ func (s *TenantSkillService) execInstall(
 		return res, fmt.Errorf("command failed (%s)", describeExecFailure(res))
 	}
 	return res, nil
+}
+
+// ensureDeclaredDependencyTrees is a deterministic fallback for installer
+// models that return a prose answer without calling shell_exec. It does not
+// disturb a tree the agent already created, and the normal verification below
+// remains authoritative for both the installed distributions and script
+// imports.
+func (s *TenantSkillService) ensureDeclaredDependencyTrees(
+	ctx context.Context, mgr sandbox.Manager, sessionID, skillDir string, bundle *SkillBundle,
+) error {
+	if bundleHasPythonDeps(bundle) {
+		venvPython := path.Join(skillDir, ".venv", "bin", "python")
+		if _, err := s.execInstall(ctx, mgr, sessionID,
+			fmt.Sprintf("test -x %s", sandbox.ShellQuote(venvPython))); err != nil {
+			var install string
+			if _, ok := bundle.Files["requirements.txt"]; ok {
+				install = fmt.Sprintf(
+					"cd %s && uv venv .venv && uv pip install --python .venv/bin/python -r requirements.txt",
+					sandbox.ShellQuote(skillDir),
+				)
+			} else {
+				install = fmt.Sprintf("cd %s && uv sync", sandbox.ShellQuote(skillDir))
+			}
+			if _, installErr := s.execInstall(ctx, mgr, sessionID, install); installErr != nil {
+				return fmt.Errorf("install declared Python dependencies: %w", installErr)
+			}
+		}
+	}
+
+	if bundleHasNodeDeps(bundle) {
+		nodeModules := path.Join(skillDir, "node_modules")
+		if _, err := s.execInstall(ctx, mgr, sessionID,
+			fmt.Sprintf("test -d %s", sandbox.ShellQuote(nodeModules))); err != nil {
+			install := fmt.Sprintf("cd %s && npm install --omit=dev", sandbox.ShellQuote(skillDir))
+			if _, installErr := s.execInstall(ctx, mgr, sessionID, install); installErr != nil {
+				return fmt.Errorf("install declared Node dependencies: %w", installErr)
+			}
+		}
+	}
+	return nil
 }
 
 func (s *TenantSkillService) tenantForStorage(ctx context.Context, tenantID uint64) *types.Tenant {

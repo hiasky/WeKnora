@@ -72,14 +72,15 @@ func (h *Handler) ListSessionArtifacts(c *gin.Context) {
 	items := make([]artifactListItem, 0, len(artifacts))
 	for i, a := range artifacts {
 		items = append(items, artifactListItem{
-			Index:      i,
-			Handle:     artifactHandle(a),
-			FileName:   a.FileName,
-			FileType:   a.FileType,
-			FileSize:   a.FileSize,
-			SourcePath: a.SourcePath,
-			ModTime:    a.ModTime,
-			CreatedAt:  a.CreatedAt,
+			Index:        i,
+			Handle:       artifactHandle(a),
+			FileName:     a.FileName,
+			FileType:     a.FileType,
+			ArtifactType: artifactType(a),
+			FileSize:     a.FileSize,
+			SourcePath:   a.SourcePath,
+			ModTime:      a.ModTime,
+			CreatedAt:    a.CreatedAt,
 		})
 	}
 
@@ -124,14 +125,15 @@ func (h *Handler) ListMessageArtifacts(c *gin.Context) {
 	items := make([]artifactListItem, 0, len(msg.Artifacts))
 	for i, a := range msg.Artifacts {
 		items = append(items, artifactListItem{
-			Index:      i,
-			Handle:     artifactHandle(a),
-			FileName:   a.FileName,
-			FileType:   a.FileType,
-			FileSize:   a.FileSize,
-			SourcePath: a.SourcePath,
-			ModTime:    a.ModTime,
-			CreatedAt:  a.CreatedAt,
+			Index:        i,
+			Handle:       artifactHandle(a),
+			FileName:     a.FileName,
+			FileType:     a.FileType,
+			ArtifactType: artifactType(a),
+			FileSize:     a.FileSize,
+			SourcePath:   a.SourcePath,
+			ModTime:      a.ModTime,
+			CreatedAt:    a.CreatedAt,
 		})
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -227,15 +229,23 @@ type artifactListItem struct {
 	// Handle is the artifact's `resource://<handle>` reference, matching the
 	// destinations in the message body. Empty when the deployment runs without
 	// a resource catalog, in which case the body references files by name.
-	Handle     string `json:"handle,omitempty"`
-	FileName   string `json:"file_name"`
-	FileType   string `json:"file_type"`
-	FileSize   int64  `json:"file_size"`
-	SourcePath string `json:"source_path"`
+	Handle       string `json:"handle,omitempty"`
+	FileName     string `json:"file_name"`
+	FileType     string `json:"file_type"`
+	ArtifactType string `json:"artifact_type"`
+	FileSize     int64  `json:"file_size"`
+	SourcePath   string `json:"source_path"`
 	// time-typed fields serialise as RFC3339 strings — same convention as
 	// the rest of the messages API.
 	ModTime   any `json:"mod_time"`
 	CreatedAt any `json:"created_at"`
+}
+
+func artifactType(a types.MessageArtifact) string {
+	if a.ArtifactType != "" {
+		return a.ArtifactType
+	}
+	return types.InferArtifactType(a.FileName)
 }
 
 // mimeTypeFor picks a Content-Type by extension and falls back to
