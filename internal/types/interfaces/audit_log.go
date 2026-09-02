@@ -14,14 +14,18 @@ import (
 // Limit is capped at 100 inside the repository regardless of caller
 // input — keeps unbounded scans off the table.
 type AuditLogQuery struct {
-	AfterID      uint64
-	Limit        int
-	Action       types.AuditAction
-	Outcome      types.AuditOutcome
-	ActorUserID  string
-	ScopeType    string
-	ScopeID      string
-	UnscopedOnly bool
+	AfterID     uint64
+	Limit       int
+	Action      types.AuditAction
+	Outcome     types.AuditOutcome
+	ActorUserID string
+	ScopeType   string
+	ScopeID     string
+	// IncludeScopeTypes augments an unscoped feed with explicitly allowed
+	// scope types. It lets the tenant audit feed expose session-scoped terminal
+	// commands without also mixing in resource-scoped activity feeds.
+	IncludeScopeTypes []string
+	UnscopedOnly      bool
 }
 
 // AuditLogRepository is the storage primitive for the audit table.

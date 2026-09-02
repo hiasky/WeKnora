@@ -75,7 +75,13 @@ func (r *auditLogRepository) List(
 			tx = tx.Where("scope_id = ?", q.ScopeID)
 		}
 		if q.UnscopedOnly {
-			tx = tx.Where("scope_type = ''")
+			if len(q.IncludeScopeTypes) == 0 {
+				tx = tx.Where("scope_type = ''")
+			} else {
+				tx = tx.Where("(scope_type = '' OR scope_type IN ?)", q.IncludeScopeTypes)
+			}
+		} else if len(q.IncludeScopeTypes) > 0 {
+			tx = tx.Where("scope_type IN ?", q.IncludeScopeTypes)
 		}
 	}
 

@@ -76,12 +76,16 @@ func (h *AuditLogHandler) ListTenantAuditLog(c *gin.Context) {
 	}
 
 	q := &interfaces.AuditLogQuery{
-		AfterID:      afterID,
-		Limit:        limit,
-		Action:       types.AuditAction(c.Query("action")),
-		Outcome:      types.AuditOutcome(c.Query("outcome")),
-		ActorUserID:  c.Query("actor"),
-		UnscopedOnly: true,
+		AfterID:     afterID,
+		Limit:       limit,
+		Action:      types.AuditAction(c.Query("action")),
+		Outcome:     types.AuditOutcome(c.Query("outcome")),
+		ActorUserID: c.Query("actor"),
+		// Terminal commands are session-scoped so their session ID is durable
+		// audit context. Include them in the space-level feed, while keeping
+		// knowledge-base and other resource-scoped activity out of this view.
+		IncludeScopeTypes: []string{"session"},
+		UnscopedOnly:      true,
 	}
 
 	entries, err := h.auditService.List(ctx, tenantID, q)

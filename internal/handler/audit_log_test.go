@@ -103,6 +103,9 @@ func TestAuditLogHandler_PassesQueryFiltersThrough(t *testing.T) {
 			if !q.UnscopedOnly {
 				t.Fatalf("tenant audit feed must exclude resource-scoped activity rows")
 			}
+			if len(q.IncludeScopeTypes) != 1 || q.IncludeScopeTypes[0] != "session" {
+				t.Fatalf("tenant audit feed must include session-scoped terminal commands, got %v", q.IncludeScopeTypes)
+			}
 			return nil, nil
 		},
 	}
