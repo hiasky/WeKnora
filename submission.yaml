@@ -1,0 +1,15 @@
+version: 1
+student:
+  name: "余昊"
+  github_id: "hiasky"
+topic:
+  id: "2"
+  title: "可视化沙箱工作台"
+result:
+  type: code
+  url: "https://github.com/hiasky/WeKnora/tree/feature/visual-sandbox-workbench"
+repository:
+  url: "https://github.com/hiasky/WeKnora.git"
+  branch: "feature/visual-sandbox-workbench"
+  commit: "443a943ff3c67216d0b3071877d7315eb8a8fa30"
+  tag: "rhino-2026-final-2"
