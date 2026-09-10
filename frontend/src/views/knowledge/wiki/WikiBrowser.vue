@@ -104,6 +104,23 @@
               <span class="legend-action-icon"><t-icon name="rollback" /></span>
               <span>{{ $t('knowledgeEditor.wikiBrowser.backToOverview') }}</span>
             </div>
+            <div class="legend-action" :class="{ disabled: learningProfileExporting }" @click="handleExportLearningProfile">
+              <span class="legend-action-icon"><t-icon name="download" /></span>
+              <span>{{ $t('knowledgeEditor.wikiBrowser.exportLearningProfile') }}</span>
+            </div>
+            <t-popconfirm
+              theme="danger"
+              :content="$t('knowledgeEditor.wikiBrowser.deleteLearningProfileConfirm')"
+              :confirm-btn="{ content: $t('common.delete'), theme: 'danger' }"
+              :cancel-btn="$t('common.cancel')"
+              placement="right"
+              @confirm="handleDeleteLearningProfile"
+            >
+              <div class="legend-action danger" :class="{ disabled: learningProfileDeleting }">
+                <span class="legend-action-icon"><t-icon name="delete" /></span>
+                <span>{{ $t('knowledgeEditor.wikiBrowser.deleteLearningProfile') }}</span>
+              </div>
+            </t-popconfirm>
           </div>
           <template v-if="graphStatusCard">
             <div class="wiki-graph-status-card">
@@ -828,6 +845,8 @@ import {
   getWikiPage,
   getWikiIndex,
   getWikiGraph,
+  getWikiLearningProfile,
+  deleteWikiLearningProfile,
   getWikiStats,
   searchWikiPages,
   listWikiIssues,
@@ -1438,6 +1457,42 @@ const graphFrontierCount = computed(() => {
 
 const graphFamiliarCount = computed(() => graphData.value?.meta?.familiar_count || 0)
 const graphRecommendedCount = computed(() => graphData.value?.meta?.recommended_count || 0)
+const learningProfileExporting = ref(false)
+const learningProfileDeleting = ref(false)
+
+async function handleExportLearningProfile() {
+  if (learningProfileExporting.value) return
+  learningProfileExporting.value = true
+  try {
+    const profile = await getWikiLearningProfile(props.knowledgeBaseId)
+    const blob = new Blob([JSON.stringify(profile, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'weknora-learning-profile.json'
+    link.click()
+    URL.revokeObjectURL(url)
+    MessagePlugin.success(t('knowledgeEditor.wikiBrowser.exportLearningProfileSuccess'))
+  } catch (error: any) {
+    MessagePlugin.error(error?.message || t('knowledgeEditor.wikiBrowser.exportLearningProfileFailed'))
+  } finally {
+    learningProfileExporting.value = false
+  }
+}
+
+async function handleDeleteLearningProfile() {
+  if (learningProfileDeleting.value) return
+  learningProfileDeleting.value = true
+  try {
+    await deleteWikiLearningProfile(props.knowledgeBaseId)
+    await loadGraph()
+    MessagePlugin.success(t('knowledgeEditor.wikiBrowser.deleteLearningProfileSuccess'))
+  } catch (error: any) {
+    MessagePlugin.error(error?.message || t('knowledgeEditor.wikiBrowser.deleteLearningProfileFailed'))
+  } finally {
+    learningProfileDeleting.value = false
+  }
+}
 
 // graphStatusCard drives the little summary panel below the legend.
 //
@@ -6372,6 +6427,15 @@ onUnmounted(() => {
       color: var(--td-brand-color);
     }
   }
+}
+
+.legend-action.danger {
+  color: var(--td-error-color);
+}
+
+.legend-action.disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .wiki-graph-truncation-hint {
