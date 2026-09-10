@@ -800,6 +800,24 @@ type MemoryDocAffinity struct {
 
 func (MemoryDocAffinity) TableName() string { return "memory_doc_affinity" }
 
+// MemoryWikiAffinity records successful wiki_read_page usage. Unlike document
+// affinity, its key is the stable KB-local Wiki slug, so Wiki-first agents can
+// light the exact page they actually placed in the model context.
+type MemoryWikiAffinity struct {
+	ID              string    `json:"id" gorm:"primaryKey;type:varchar(36)"`
+	TenantID        uint64    `json:"tenant_id" gorm:"not null;uniqueIndex:idx_mem_wiki_affinity_scope,priority:1"`
+	SubjectID       string    `json:"subject_id" gorm:"type:varchar(512);not null;uniqueIndex:idx_mem_wiki_affinity_scope,priority:2"`
+	KnowledgeBaseID string    `json:"knowledge_base_id" gorm:"type:varchar(36);not null;uniqueIndex:idx_mem_wiki_affinity_scope,priority:3"`
+	Slug            string    `json:"slug" gorm:"type:varchar(512);not null;uniqueIndex:idx_mem_wiki_affinity_scope,priority:4"`
+	Title           string    `json:"title" gorm:"type:varchar(512);not null;default:''"`
+	Hits            int       `json:"hits" gorm:"not null;default:0"`
+	LastUsedAt      time.Time `json:"last_used_at" gorm:"column:last_used_at"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+func (MemoryWikiAffinity) TableName() string { return "memory_wiki_affinity" }
+
 // MemoryTombstone records that a statement was deliberately forgotten, so the
 // background distillation cannot quietly re-add it the next time it reads the
 // message it came from.

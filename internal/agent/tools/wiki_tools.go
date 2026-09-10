@@ -725,6 +725,24 @@ func (t *wikiReadPageTool) Execute(ctx context.Context, args json.RawMessage) (*
 	if len(errs) > 0 {
 		finalOutput += fmt.Sprintf("\n\n<errors>\n%s\n</errors>", strings.Join(errs, "\n"))
 	}
+	omittedSet := make(map[string]struct{}, len(omittedSlugs))
+	for _, slug := range omittedSlugs {
+		omittedSet[slug] = struct{}{}
+	}
+	readPages := make([]map[string]string, 0, len(pending))
+	for _, resolved := range pending {
+		if resolved.page == nil {
+			continue
+		}
+		if _, omitted := omittedSet[resolved.page.Slug]; omitted {
+			continue
+		}
+		readPages = append(readPages, map[string]string{
+			"knowledge_base_id": resolved.kbID,
+			"slug":              resolved.page.Slug,
+			"title":             resolved.page.Title,
+		})
+	}
 
 	// Surface ambiguous slugs so the caller (and logs) can see when a slug
 	// resolved to more than one KB.
@@ -740,6 +758,7 @@ func (t *wikiReadPageTool) Execute(ctx context.Context, args json.RawMessage) (*
 		Output:  finalOutput,
 		Data: map[string]interface{}{
 			"found_kbs":       foundKBs,
+			"read_pages":      readPages,
 			"ambiguous_slugs": ambiguous,
 			"truncated_slugs": truncatedSlugs,
 			"omitted_slugs":   omittedSlugs,

@@ -685,6 +685,7 @@ type WikiGraphRequest struct {
 	// FamiliarDocumentHits carries the observable evidence behind familiarity.
 	// The score is derived from answer citations, never guessed by an LLM.
 	FamiliarDocumentHits map[string]int
+	WikiPageHits         map[string]int
 }
 
 // WikiGraphData represents the link graph structure for visualization.
@@ -725,6 +726,8 @@ type WikiGraphNode struct {
 	// on repeated answer citations to this page's source documents.
 	MasteryScore              int    `json:"mastery_score"`
 	EvidenceHits              int    `json:"evidence_hits"`
+	WikiEvidenceHits          int    `json:"wiki_evidence_hits"`
+	DocumentEvidenceHits      int    `json:"document_evidence_hits"`
 	Recommended               bool   `json:"recommended,omitempty"`
 	RecommendationReason      string `json:"recommendation_reason,omitempty"`
 	RecommendationAnchorTitle string `json:"recommendation_anchor_title,omitempty"`

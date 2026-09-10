@@ -1032,6 +1032,62 @@ func (r *memoryRepository) DeleteAllDocAffinity(
 	return r.scoped(ctx, scope).Delete(&types.MemoryDocAffinity{}).Error
 }
 
+// BumpWikiAffinity increments each page at most once per completed answer; the
+// caller de-duplicates the turn before reaching the repository.
+func (r *memoryRepository) BumpWikiAffinity(
+	ctx context.Context, scope interfaces.MemoryScope, pages []types.MemoryWikiAffinity,
+) error {
+	now := time.Now()
+	for _, page := range pages {
+		if page.KnowledgeBaseID == "" || page.Slug == "" {
+			continue
+		}
+		row := &types.MemoryWikiAffinity{
+			ID: uuid.New().String(), TenantID: scope.TenantID, SubjectID: scope.SubjectID,
+			KnowledgeBaseID: page.KnowledgeBaseID, Slug: page.Slug, Title: page.Title,
+			LastUsedAt: now,
+		}
+		if err := r.db.WithContext(ctx).Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "tenant_id"}, {Name: "subject_id"}, {Name: "knowledge_base_id"}, {Name: "slug"}},
+			DoNothing: true,
+		}).Create(row).Error; err != nil {
+			return err
+		}
+		updates := map[string]interface{}{"hits": gorm.Expr("hits + 1"), "last_used_at": now, "updated_at": now}
+		if page.Title != "" {
+			updates["title"] = page.Title
+		}
+		if err := r.scoped(ctx, scope).Model(&types.MemoryWikiAffinity{}).
+			Where("knowledge_base_id = ? AND slug = ?", page.KnowledgeBaseID, page.Slug).
+			Updates(updates).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *memoryRepository) WikiAffinityForKnowledgeBase(
+	ctx context.Context, scope interfaces.MemoryScope, kbID string,
+) ([]*types.MemoryWikiAffinity, error) {
+	var rows []*types.MemoryWikiAffinity
+	err := r.scoped(ctx, scope).Where("knowledge_base_id = ?", kbID).
+		Order("hits DESC, last_used_at DESC").Find(&rows).Error
+	return rows, err
+}
+
+func (r *memoryRepository) DeleteWikiAffinityForKnowledgeBase(
+	ctx context.Context, scope interfaces.MemoryScope, kbID string,
+) (int64, error) {
+	result := r.scoped(ctx, scope).Where("knowledge_base_id = ?", kbID).Delete(&types.MemoryWikiAffinity{})
+	return result.RowsAffected, result.Error
+}
+
+func (r *memoryRepository) DeleteAllWikiAffinity(
+	ctx context.Context, scope interfaces.MemoryScope,
+) error {
+	return r.scoped(ctx, scope).Delete(&types.MemoryWikiAffinity{}).Error
+}
+
 func (r *memoryRepository) CountActive(
 	ctx context.Context, scope interfaces.MemoryScope,
 ) (int64, error) {

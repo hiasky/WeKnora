@@ -21,11 +21,12 @@
 原型的“掌握度”准确说是**有证据的使用熟悉度**，不是考试能力：
 
 ```text
-evidence_hits(page) = sum(memory_doc_affinity.hits for page.source_knowledge_ids)
+evidence_hits(page) = memory_wiki_affinity.hits(page.slug)
+                    + sum(memory_doc_affinity.hits for page.source_knowledge_ids)
 mastery_score(page) = min(100, evidence_hits(page) * 10)
 ```
 
-`memory_doc_affinity.hits` 只在回答实际采用某文档作为来源时增长。分数因而可重算、可解释、与 LLM 的主观自评无关。两次引用达到现有“常用资料”阈值；十次封顶只是 UI 标尺，不声称用户达到教育学意义上的完全掌握。
+`memory_wiki_affinity.hits` 在成功的 `wiki_read_page` 把页面实际放入模型上下文时增长；一次回答内重复读取同页只计一次，搜索命中、失败和因预算省略均不计。`memory_doc_affinity.hits` 只在回答实际采用某原始文档作为来源时增长。两类证据在导出中分别呈现，分数可重算、可解释、与 LLM 的主观自评无关。十次封顶只是 UI 标尺，不声称用户达到教育学意义上的完全掌握。
 
 局限：阅读/引用并不等于理解，而且一个页面可能继承整篇文档的点击证据。后续应加入独立证据并分别展示：用户主动打开并停留（弱）、能够正确回答检索增强生成的题目（强）、间隔复习后仍答对（最强）。不要把这些信号先交给模型再只保存一个不可解释分数。
 
@@ -45,6 +46,8 @@ Wiki 链接不表达先修方向，所以本版将边视为无向关系，不声
   -> 确定性掌握度
   -> Wiki 邻接 frontier
   -> 图谱亮度、蓝色已使用环、橙色虚线推荐环
+
+Wiki-first 回答则走 `wiki_read_page -> read_pages -> memory_wiki_affinity -> slug 精确映射`，不依赖原始文档引用卡片。
 ```
 
 接口均沿用 Wiki 的 `Viewer + KBAccessRead`，用户身份只从请求上下文解析，不接受 `tenant_id` 或 `subject_id` 参数：

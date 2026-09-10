@@ -78,3 +78,29 @@ func TestClearDropsDocumentAffinity(t *testing.T) {
 	require.Zero(t, total)
 	require.Empty(t, docs)
 }
+
+func TestWikiPageAffinityCountsUsesAndStaysIsolated(t *testing.T) {
+	svc, _, tenantRepo := newMemoryHarness(t)
+	alice := enabledCtx(t, tenantRepo, 1, "alice")
+	bob := enabledCtx(t, tenantRepo, 1, "bob")
+	page := []types.MemoryWikiAffinity{{KnowledgeBaseID: "kb-1", Slug: "entity/yu-zhu", Title: "玉竹"}}
+	svc.RecordWikiPageUses(alice, page)
+	svc.RecordWikiPageUses(alice, page)
+
+	require.Equal(t, map[string]int{"entity/yu-zhu": 2}, svc.WikiAffinityHitsForKnowledgeBase(alice, "kb-1"))
+	require.Empty(t, svc.WikiAffinityHitsForKnowledgeBase(alice, "kb-2"))
+	require.Empty(t, svc.WikiAffinityHitsForKnowledgeBase(bob, "kb-1"))
+}
+
+func TestDeleteLearningEvidenceDropsWikiAndDocumentAffinity(t *testing.T) {
+	svc, _, tenantRepo := newMemoryHarness(t)
+	ctx := enabledCtx(t, tenantRepo, 1, "alice")
+	svc.RecordWikiPageUses(ctx, []types.MemoryWikiAffinity{{KnowledgeBaseID: "kb-1", Slug: "entity/yu-zhu"}})
+	svc.RecordAnswerSources(ctx, []types.MemoryDocAffinity{{KnowledgeID: "doc-1", KnowledgeBaseID: "kb-1"}})
+
+	removed, err := svc.DeleteDocumentAffinitiesForKnowledgeBase(ctx, "kb-1")
+	require.NoError(t, err)
+	require.Equal(t, 2, removed)
+	require.Empty(t, svc.WikiAffinityHitsForKnowledgeBase(ctx, "kb-1"))
+	require.Empty(t, svc.DocumentAffinityHitsForKnowledgeBase(ctx, "kb-1"))
+}

@@ -671,18 +671,22 @@ func computeGraphSubset(pages []*types.WikiPage, req *types.WikiGraphRequest) (*
 	nodes := make([]types.WikiGraphNode, 0, len(selected))
 	for slug := range selected {
 		p := pageBySlug[slug]
-		evidenceHits := 0
+		documentEvidenceHits := 0
 		for _, knowledgeID := range p.SourceKnowledgeIDs() {
-			evidenceHits += req.FamiliarDocumentHits[knowledgeID]
+			documentEvidenceHits += req.FamiliarDocumentHits[knowledgeID]
 		}
+		wikiEvidenceHits := req.WikiPageHits[p.Slug]
+		evidenceHits := documentEvidenceHits + wikiEvidenceHits
 		nodes = append(nodes, types.WikiGraphNode{
-			Slug:         p.Slug,
-			Title:        p.Title,
-			PageType:     p.PageType,
-			LinkCount:    linkCount[slug],
-			Familiar:     p.BuiltFrom(familiarSet),
-			MasteryScore: masteryScoreFromHits(evidenceHits),
-			EvidenceHits: evidenceHits,
+			Slug:                 p.Slug,
+			Title:                p.Title,
+			PageType:             p.PageType,
+			LinkCount:            linkCount[slug],
+			Familiar:             p.BuiltFrom(familiarSet),
+			MasteryScore:         masteryScoreFromHits(evidenceHits),
+			EvidenceHits:         evidenceHits,
+			WikiEvidenceHits:     wikiEvidenceHits,
+			DocumentEvidenceHits: documentEvidenceHits,
 		})
 	}
 	// Recommend the frontier: unseen pages directly connected to something the

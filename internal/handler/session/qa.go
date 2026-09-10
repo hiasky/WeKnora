@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	agenttools "github.com/Tencent/WeKnora/internal/agent/tools"
 	"github.com/Tencent/WeKnora/internal/application/access"
 	"github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/event"
@@ -1719,7 +1720,63 @@ func (h *Handler) recordTurnMemory(
 		}
 	}
 	h.recordAnswerSources(ctx, assistantMessage)
+	h.recordWikiPageUses(ctx, assistantMessage)
 	h.memoryService.ScheduleExtraction(ctx, assistantMessage.SessionID, assistantMessage.ID, assistantMessage.ModelID)
+}
+
+type wikiPageUseRecorder interface {
+	RecordWikiPageUses(context.Context, []types.MemoryWikiAffinity)
+}
+
+// recordWikiPageUses counts pages that wiki_read_page successfully rendered
+// into this answer's model context. Search hits alone are not counted, and a
+// page read repeatedly inside one turn still contributes one observation.
+func (h *Handler) recordWikiPageUses(ctx context.Context, assistantMessage *types.Message) {
+	recorder, ok := h.memoryService.(wikiPageUseRecorder)
+	if !ok || assistantMessage == nil {
+		return
+	}
+	recorder.RecordWikiPageUses(ctx, wikiPageUsesFromSteps(assistantMessage.AgentSteps))
+}
+
+func wikiPageUsesFromSteps(steps types.AgentSteps) []types.MemoryWikiAffinity {
+	seen := make(map[string]struct{})
+	var pages []types.MemoryWikiAffinity
+	add := func(kbID, slug, title string) {
+		kbID, slug = strings.TrimSpace(kbID), strings.TrimSpace(slug)
+		if kbID == "" || slug == "" {
+			return
+		}
+		key := kbID + "\x00" + slug
+		if _, exists := seen[key]; exists {
+			return
+		}
+		seen[key] = struct{}{}
+		pages = append(pages, types.MemoryWikiAffinity{KnowledgeBaseID: kbID, Slug: slug, Title: title})
+	}
+	for _, step := range steps {
+		for _, call := range step.ToolCalls {
+			if call.ExecutionName() != agenttools.ToolWikiReadPage || call.Result == nil || !call.Result.Success {
+				continue
+			}
+			switch rows := call.Result.Data["read_pages"].(type) {
+			case []map[string]string:
+				for _, row := range rows {
+					add(row["knowledge_base_id"], row["slug"], row["title"])
+				}
+			case []interface{}:
+				for _, raw := range rows {
+					if row, ok := raw.(map[string]interface{}); ok {
+						kbID, _ := row["knowledge_base_id"].(string)
+						slug, _ := row["slug"].(string)
+						title, _ := row["title"].(string)
+						add(kbID, slug, title)
+					}
+				}
+			}
+		}
+	}
+	return pages
 }
 
 // recordAnswerSources notes which documents this answer drew on, so the

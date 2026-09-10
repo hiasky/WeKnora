@@ -505,6 +505,26 @@ func TestComputeGraphSubset_ComputesMasteryAndLearningFrontier(t *testing.T) {
 	}
 }
 
+func TestComputeGraphSubset_IncludesDirectWikiReadEvidence(t *testing.T) {
+	pages := makeGraphFixture()
+	got, err := computeGraphSubset(pages, &types.WikiGraphRequest{
+		Mode: types.WikiGraphModeOverview, Limit: 0,
+		WikiPageHits: map[string]int{"hub": 2},
+	})
+	if err != nil {
+		t.Fatalf("computeGraphSubset: %v", err)
+	}
+	for _, node := range got.Nodes {
+		if node.Slug == "hub" {
+			if node.MasteryScore != 20 || node.WikiEvidenceHits != 2 || node.DocumentEvidenceHits != 0 {
+				t.Fatalf("unexpected Wiki evidence projection: %+v", node)
+			}
+			return
+		}
+	}
+	t.Fatal("hub node missing")
+}
+
 func TestMasteryScoreFromHitsIsBoundedAndReproducible(t *testing.T) {
 	for _, tc := range []struct{ hits, want int }{{-1, 0}, {0, 0}, {1, 10}, {4, 40}, {10, 100}, {99, 100}} {
 		if got := masteryScoreFromHits(tc.hits); got != tc.want {

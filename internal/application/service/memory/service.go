@@ -48,6 +48,13 @@ type Service struct {
 	config       *config.Config
 }
 
+type wikiAffinityRepository interface {
+	BumpWikiAffinity(context.Context, interfaces.MemoryScope, []types.MemoryWikiAffinity) error
+	WikiAffinityForKnowledgeBase(context.Context, interfaces.MemoryScope, string) ([]*types.MemoryWikiAffinity, error)
+	DeleteWikiAffinityForKnowledgeBase(context.Context, interfaces.MemoryScope, string) (int64, error)
+	DeleteAllWikiAffinity(context.Context, interfaces.MemoryScope) error
+}
+
 // NewMemoryService builds the long-term memory service.
 func NewMemoryService(
 	repo interfaces.MemoryRepository,
@@ -673,6 +680,52 @@ func (s *Service) DocumentAffinityHitsForKnowledgeBase(ctx context.Context, kbID
 	return hits
 }
 
+// RecordWikiPageUses stores successful wiki_read_page pages as first-class
+// learning evidence. One page is counted once per answer by the caller.
+func (s *Service) RecordWikiPageUses(ctx context.Context, pages []types.MemoryWikiAffinity) {
+	if len(pages) == 0 {
+		return
+	}
+	scope, _, ok := s.enabledScope(ctx)
+	if !ok {
+		return
+	}
+	repo, ok := s.repo.(wikiAffinityRepository)
+	if !ok {
+		return
+	}
+	if _, err := s.repo.EnsureSubject(ctx, scope); err != nil {
+		logger.Warnf(ctx, "memory: ensure subject for wiki affinity failed: %v", err)
+		return
+	}
+	if err := repo.BumpWikiAffinity(ctx, scope, pages); err != nil {
+		logger.Warnf(ctx, "memory: record wiki page uses failed: %v", err)
+	}
+}
+
+func (s *Service) WikiAffinityHitsForKnowledgeBase(ctx context.Context, kbID string) map[string]int {
+	scope, err := ResolveScope(ctx)
+	if err != nil {
+		return nil
+	}
+	repo, ok := s.repo.(wikiAffinityRepository)
+	if !ok {
+		return nil
+	}
+	rows, err := repo.WikiAffinityForKnowledgeBase(ctx, scope, kbID)
+	if err != nil {
+		logger.Warnf(ctx, "memory: load wiki learning evidence failed: %v", err)
+		return nil
+	}
+	hits := make(map[string]int, len(rows))
+	for _, row := range rows {
+		if row != nil && row.Slug != "" && row.Hits > 0 {
+			hits[row.Slug] = row.Hits
+		}
+	}
+	return hits
+}
+
 // DeleteDocumentAffinitiesForKnowledgeBase permanently removes every source
 // counter for one KB in the current principal's scope, including counters
 // below the public "familiar document" threshold.
@@ -694,6 +747,13 @@ func (s *Service) DeleteDocumentAffinitiesForKnowledgeBase(ctx context.Context, 
 			return removed, err
 		}
 		removed++
+	}
+	if repo, ok := s.repo.(wikiAffinityRepository); ok {
+		wikiRemoved, deleteErr := repo.DeleteWikiAffinityForKnowledgeBase(ctx, scope, kbID)
+		removed += int(wikiRemoved)
+		if deleteErr != nil {
+			return removed, deleteErr
+		}
 	}
 	return removed, nil
 }
@@ -853,6 +913,11 @@ func (s *Service) Clear(ctx context.Context) (int64, error) {
 	}
 	if err := s.repo.DeleteAllDocAffinity(ctx, scope); err != nil {
 		return 0, err
+	}
+	if repo, ok := s.repo.(wikiAffinityRepository); ok {
+		if err := repo.DeleteAllWikiAffinity(ctx, scope); err != nil {
+			return 0, err
+		}
 	}
 	s.rebuildBlock(ctx, scope)
 	return removed, nil

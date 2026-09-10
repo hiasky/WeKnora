@@ -196,6 +196,10 @@ func TestWikiReadPageRoutesEachSlugIndependently(t *testing.T) {
 	if !reflect.DeepEqual(service.getCalls, wantCalls) {
 		t.Fatalf("GetPageBySlug calls = %v, want %v", service.getCalls, wantCalls)
 	}
+	readPages, ok := result.Data["read_pages"].([]map[string]string)
+	if !ok || len(readPages) != 2 {
+		t.Fatalf("read_pages = %#v, want the two pages rendered for the model", result.Data["read_pages"])
+	}
 }
 
 func TestWikiReadPageFallsBackWhenCachedRouteIsStale(t *testing.T) {

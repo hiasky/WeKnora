@@ -879,6 +879,7 @@ const learningProfileMaxNodes = 2000
 
 type wikiLearningMemory interface {
 	DocumentAffinityHitsForKnowledgeBase(ctx context.Context, kbID string) map[string]int
+	WikiAffinityHitsForKnowledgeBase(ctx context.Context, kbID string) map[string]int
 	DeleteDocumentAffinitiesForKnowledgeBase(ctx context.Context, kbID string) (int, error)
 }
 
@@ -891,6 +892,7 @@ func (h *WikiPageHandler) populateLearningEvidence(ctx context.Context, kbID str
 	}
 	if learningMemory, ok := h.memoryService.(wikiLearningMemory); ok {
 		req.FamiliarDocumentHits = learningMemory.DocumentAffinityHitsForKnowledgeBase(ctx, kbID)
+		req.WikiPageHits = learningMemory.WikiAffinityHitsForKnowledgeBase(ctx, kbID)
 		for knowledgeID, hits := range req.FamiliarDocumentHits {
 			if hits >= types.MemoryDocAffinityMinHits {
 				req.FamiliarKnowledgeIDs = append(req.FamiliarKnowledgeIDs, knowledgeID)
