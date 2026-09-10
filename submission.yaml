@@ -1,0 +1,15 @@
+version: 1
+student:
+  name: "余昊"
+  github_id: "hiasky"
+topic:
+  id: "4"
+  title: "知识网络与引导式学习"
+result:
+  type: code
+  url: "https://github.com/hiasky/WeKnora"
+repository:
+  url: "git@hiasky:hiasky/WeKnora.git"
+  branch: "feature/guided-learning"
+  commit: "d08d1dbf761e91fcee9623a01f9ef2397b946dc8"
+  tag: "rhino-2026-final-4"
