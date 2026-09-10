@@ -77,12 +77,20 @@ export interface WikiGraphMeta {
   center?: string;
   depth?: number;
   familiar_count?: number;
+  mastered_count?: number;
+  recommended_count?: number;
 }
 
 export interface WikiGraphData {
-  nodes: { slug: string; title: string; page_type: string; link_count: number; familiar?: boolean }[];
+  nodes: { slug: string; title: string; page_type: string; link_count: number; familiar?: boolean; mastery_score: number; evidence_hits: number; recommended?: boolean; recommendation_reason?: string; recommendation_anchor_title?: string }[];
   edges: { source: string; target: string }[];
   meta: WikiGraphMeta;
+}
+
+export interface WikiLearningProfile {
+  knowledge_base_id: string;
+  definition: string;
+  data: WikiGraphData;
 }
 
 export interface WikiStats {
@@ -325,6 +333,18 @@ export function getWikiGraph(kbId: string, params?: WikiGraphQueryParams) {
   }
   const qs = query.toString();
   return get(`/api/v1/knowledgebase/${kbId}/wiki/graph${qs ? '?' + qs : ''}`);
+}
+
+export function getWikiLearningProfile(kbId: string) {
+  return get<WikiLearningProfile>(`/api/v1/knowledgebase/${kbId}/wiki/learning-profile`);
+}
+
+export function deleteWikiLearningProfile(kbId: string) {
+  return del<{ success: boolean; removed: number }>(`/api/v1/knowledgebase/${kbId}/wiki/learning-profile`);
+}
+
+export function getWikiLearningProfileExportUrl(kbId: string) {
+  return `/api/v1/knowledgebase/${kbId}/wiki/learning-profile/export`;
 }
 
 export function getWikiStats(kbId: string) {

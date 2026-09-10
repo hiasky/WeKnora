@@ -864,9 +864,7 @@ func (h *WikiPageHandler) GetGraph(c *gin.Context) {
 		Types:           typesFilter,
 		Limit:           limit,
 	}
-	if h.memoryService != nil {
-		req.FamiliarKnowledgeIDs = h.memoryService.FamiliarKnowledgeIDs(c.Request.Context())
-	}
+	h.populateLearningEvidence(c.Request.Context(), kbID, req)
 
 	graph, err := h.wikiService.GetGraph(c.Request.Context(), req)
 	if err != nil {
@@ -875,6 +873,119 @@ func (h *WikiPageHandler) GetGraph(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, graph)
+}
+
+const learningProfileMaxNodes = 2000
+
+type wikiLearningMemory interface {
+	DocumentAffinityHitsForKnowledgeBase(ctx context.Context, kbID string) map[string]int
+	DeleteDocumentAffinitiesForKnowledgeBase(ctx context.Context, kbID string) (int, error)
+}
+
+// populateLearningEvidence overlays only the current principal's evidence.
+// MemoryService resolves tenant and subject from ctx, so neither identifier is
+// accepted from the client and cross-tenant/profile reads are impossible here.
+func (h *WikiPageHandler) populateLearningEvidence(ctx context.Context, kbID string, req *types.WikiGraphRequest) {
+	if h.memoryService == nil {
+		return
+	}
+	if learningMemory, ok := h.memoryService.(wikiLearningMemory); ok {
+		req.FamiliarDocumentHits = learningMemory.DocumentAffinityHitsForKnowledgeBase(ctx, kbID)
+		for knowledgeID, hits := range req.FamiliarDocumentHits {
+			if hits >= types.MemoryDocAffinityMinHits {
+				req.FamiliarKnowledgeIDs = append(req.FamiliarKnowledgeIDs, knowledgeID)
+			}
+		}
+		return
+	}
+	docs, _, err := h.memoryService.ListDocuments(ctx, 200, 0)
+	if err != nil {
+		req.FamiliarKnowledgeIDs = h.memoryService.FamiliarKnowledgeIDs(ctx)
+		return
+	}
+	req.FamiliarDocumentHits = make(map[string]int, len(docs))
+	for _, doc := range docs {
+		if doc != nil && doc.KnowledgeBaseID == kbID {
+			req.FamiliarKnowledgeIDs = append(req.FamiliarKnowledgeIDs, doc.KnowledgeID)
+			req.FamiliarDocumentHits[doc.KnowledgeID] = doc.Hits
+		}
+	}
+}
+
+func (h *WikiPageHandler) learningProfile(ctx context.Context, kbID string) (*types.WikiGraphData, error) {
+	req := &types.WikiGraphRequest{
+		KnowledgeBaseID: kbID,
+		Mode:            types.WikiGraphModeOverview,
+		Limit:           learningProfileMaxNodes,
+	}
+	h.populateLearningEvidence(ctx, kbID, req)
+	return h.wikiService.GetGraph(ctx, req)
+}
+
+// GetLearningProfile returns the current person's explainable mastery overlay
+// and next-step frontier for this Wiki knowledge base.
+func (h *WikiPageHandler) GetLearningProfile(c *gin.Context) {
+	kbID, _, err := h.validateWikiKB(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	profile, err := h.learningProfile(c.Request.Context(), kbID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"knowledge_base_id": kbID,
+		"definition":        "mastery_score=min(100, answer_source_citations*10); recommendations are unmastered direct Wiki neighbors",
+		"data":              profile,
+	})
+}
+
+// ExportLearningProfile downloads the same user-visible profile as JSON.
+func (h *WikiPageHandler) ExportLearningProfile(c *gin.Context) {
+	c.Header("Content-Disposition", `attachment; filename="weknora-learning-profile.json"`)
+	h.GetLearningProfile(c)
+}
+
+// DeleteLearningProfile removes the current person's source-use evidence for
+// this KB. The Wiki and every other user's overlay remain untouched.
+func (h *WikiPageHandler) DeleteLearningProfile(c *gin.Context) {
+	kbID, _, err := h.validateWikiKB(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if h.memoryService == nil {
+		c.JSON(http.StatusOK, gin.H{"success": true, "removed": 0})
+		return
+	}
+	if learningMemory, ok := h.memoryService.(wikiLearningMemory); ok {
+		removed, err := learningMemory.DeleteDocumentAffinitiesForKnowledgeBase(c.Request.Context(), kbID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "removed": removed})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true, "removed": removed})
+		return
+	}
+	docs, _, err := h.memoryService.ListDocuments(c.Request.Context(), 200, 0)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	removed := 0
+	for _, doc := range docs {
+		if doc == nil || doc.KnowledgeBaseID != kbID {
+			continue
+		}
+		if err := h.memoryService.DeleteDocument(c.Request.Context(), doc.ID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "removed": removed})
+			return
+		}
+		removed++
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "removed": removed})
 }
 
 // GetStats godoc

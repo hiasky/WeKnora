@@ -319,6 +319,9 @@ func RegisterWikiPageRoutes(r *gin.RouterGroup, wikiHandler *handler.WikiPageHan
 
 		// Graph and stats
 		wikiRead.GET("/graph", g.Viewer(), g.KBAccessRead("kb_id"), wikiHandler.GetGraph)
+		wikiRead.GET("/learning-profile", g.Viewer(), g.KBAccessRead("kb_id"), wikiHandler.GetLearningProfile)
+		wikiRead.GET("/learning-profile/export", g.Viewer(), g.KBAccessRead("kb_id"), wikiHandler.ExportLearningProfile)
+		wikiRead.DELETE("/learning-profile", g.Viewer(), g.KBAccessRead("kb_id"), wikiHandler.DeleteLearningProfile)
 		wikiRead.GET("/stats", g.Viewer(), g.KBAccessRead("kb_id"), wikiHandler.GetStats)
 
 		// Search and maintenance

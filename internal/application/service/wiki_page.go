@@ -612,6 +612,11 @@ func computeGraphSubset(pages []*types.WikiPage, req *types.WikiGraphRequest) (*
 			familiarSet[id] = struct{}{}
 		}
 	}
+	for id, hits := range req.FamiliarDocumentHits {
+		if strings.TrimSpace(id) != "" && hits >= types.MemoryDocAffinityMinHits {
+			familiarSet[id] = struct{}{}
+		}
+	}
 
 	pageBySlug := make(map[string]*types.WikiPage, len(pages))
 	linkCount := make(map[string]int, len(pages))
@@ -666,13 +671,47 @@ func computeGraphSubset(pages []*types.WikiPage, req *types.WikiGraphRequest) (*
 	nodes := make([]types.WikiGraphNode, 0, len(selected))
 	for slug := range selected {
 		p := pageBySlug[slug]
+		evidenceHits := 0
+		for _, knowledgeID := range p.SourceKnowledgeIDs() {
+			evidenceHits += req.FamiliarDocumentHits[knowledgeID]
+		}
 		nodes = append(nodes, types.WikiGraphNode{
-			Slug:      p.Slug,
-			Title:     p.Title,
-			PageType:  p.PageType,
-			LinkCount: linkCount[slug],
-			Familiar:  p.BuiltFrom(familiarSet),
+			Slug:         p.Slug,
+			Title:        p.Title,
+			PageType:     p.PageType,
+			LinkCount:    linkCount[slug],
+			Familiar:     p.BuiltFrom(familiarSet),
+			MasteryScore: masteryScoreFromHits(evidenceHits),
+			EvidenceHits: evidenceHits,
 		})
+	}
+	// Recommend the frontier: unseen pages directly connected to something the
+	// person has evidence of using. This stays deterministic and inspectable;
+	// link direction is deliberately ignored because Wiki links do not encode
+	// prerequisite semantics.
+	nodeIndex := make(map[string]int, len(nodes))
+	for i := range nodes {
+		nodeIndex[nodes[i].Slug] = i
+	}
+	for _, p := range pages {
+		i, ok := nodeIndex[p.Slug]
+		if !ok || nodes[i].MasteryScore > 0 {
+			continue
+		}
+		best := ""
+		neighbors := append(append([]string{}, p.InLinks...), p.OutLinks...)
+		for _, neighbor := range neighbors {
+			if j, exists := nodeIndex[neighbor]; exists && nodes[j].MasteryScore > 0 {
+				if best == "" || nodes[j].MasteryScore > nodes[nodeIndex[best]].MasteryScore {
+					best = neighbor
+				}
+			}
+		}
+		if best != "" {
+			nodes[i].Recommended = true
+			nodes[i].RecommendationReason = "adjacent_to_mastered"
+			nodes[i].RecommendationAnchorTitle = nodes[nodeIndex[best]].Title
+		}
 	}
 	// Deterministic node ordering — the map iteration above is random.
 	sort.Slice(nodes, func(i, j int) bool {
@@ -724,6 +763,12 @@ func computeGraphSubset(pages []*types.WikiPage, req *types.WikiGraphRequest) (*
 		if n.Familiar {
 			meta.FamiliarCount++
 		}
+		if n.MasteryScore > 0 {
+			meta.MasteredCount++
+		}
+		if n.Recommended {
+			meta.RecommendedCount++
+		}
 	}
 	if mode == types.WikiGraphModeEgo {
 		meta.Center = req.Center
@@ -738,6 +783,19 @@ func computeGraphSubset(pages []*types.WikiPage, req *types.WikiGraphRequest) (*
 		Edges: edges,
 		Meta:  meta,
 	}, nil
+}
+
+// masteryScoreFromHits maps objective repeated-use evidence onto a bounded
+// scale. Two citations cross the familiarity threshold; ten reach 100. The
+// linear rule is intentionally boring: users and evaluators can reproduce it.
+func masteryScoreFromHits(hits int) int {
+	if hits <= 0 {
+		return 0
+	}
+	if hits >= 10 {
+		return 100
+	}
+	return hits * 10
 }
 
 // bfsEgoSlugs computes the undirected BFS neighborhood of `center` up to

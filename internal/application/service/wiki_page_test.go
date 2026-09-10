@@ -473,6 +473,46 @@ func TestComputeGraphSubset_MarksFamiliarSourcePages(t *testing.T) {
 	}
 }
 
+func TestComputeGraphSubset_ComputesMasteryAndLearningFrontier(t *testing.T) {
+	pages := makeGraphFixture()
+	// hub is backed by a repeatedly cited document. Its direct unseen
+	// neighbors should become recommendations; disconnected x/y should not.
+	pages[0].SourceRefs = types.StringArray{"doc-1|排班手册"}
+
+	got, err := computeGraphSubset(pages, &types.WikiGraphRequest{
+		Mode:                 types.WikiGraphModeOverview,
+		Limit:                0,
+		FamiliarDocumentHits: map[string]int{"doc-1": 4},
+	})
+	if err != nil {
+		t.Fatalf("computeGraphSubset: %v", err)
+	}
+	nodes := make(map[string]types.WikiGraphNode, len(got.Nodes))
+	for _, node := range got.Nodes {
+		nodes[node.Slug] = node
+	}
+	if nodes["hub"].MasteryScore != 40 || nodes["hub"].EvidenceHits != 4 {
+		t.Errorf("hub evidence = %+v, want score 40 from four citations", nodes["hub"])
+	}
+	if !nodes["a"].Recommended || nodes["a"].RecommendationReason == "" {
+		t.Errorf("direct unseen neighbor a should be recommended: %+v", nodes["a"])
+	}
+	if nodes["x"].Recommended || nodes["y"].Recommended {
+		t.Errorf("disconnected nodes must not be recommended: x=%+v y=%+v", nodes["x"], nodes["y"])
+	}
+	if got.Meta.MasteredCount != 1 || got.Meta.RecommendedCount != 4 {
+		t.Errorf("unexpected learning summary: %+v", got.Meta)
+	}
+}
+
+func TestMasteryScoreFromHitsIsBoundedAndReproducible(t *testing.T) {
+	for _, tc := range []struct{ hits, want int }{{-1, 0}, {0, 0}, {1, 10}, {4, 40}, {10, 100}, {99, 100}} {
+		if got := masteryScoreFromHits(tc.hits); got != tc.want {
+			t.Errorf("masteryScoreFromHits(%d)=%d, want %d", tc.hits, got, tc.want)
+		}
+	}
+}
+
 // TestComputeGraphSubset_OverviewUncapped ensures the Limit<=0 escape hatch
 // still works for internal callers (wiki lint) that need every page.
 func TestComputeGraphSubset_OverviewUncapped(t *testing.T) {

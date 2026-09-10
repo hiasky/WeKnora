@@ -78,6 +78,10 @@
               <span class="legend-familiar-ring"></span>
               {{ $t('knowledgeEditor.wikiBrowser.legendFamiliar') }}
             </div>
+            <div v-if="graphRecommendedCount > 0" class="legend-item">
+              <span class="legend-recommended-ring"></span>
+              {{ $t('knowledgeEditor.wikiBrowser.legendRecommended') }}
+            </div>
           </div>
           <div class="legend-divider"></div>
           <div class="legend-actions">
@@ -1433,6 +1437,7 @@ const graphFrontierCount = computed(() => {
 })
 
 const graphFamiliarCount = computed(() => graphData.value?.meta?.familiar_count || 0)
+const graphRecommendedCount = computed(() => graphData.value?.meta?.recommended_count || 0)
 
 // graphStatusCard drives the little summary panel below the legend.
 //
@@ -3335,8 +3340,15 @@ function mergeGraphData(
     if (!existing) {
       nodeBySlug.set(n.slug, n)
       bloomGenerations.set(n.slug, gen)
-    } else if (n.familiar) {
-      existing.familiar = true
+    } else {
+      if (n.familiar) existing.familiar = true
+      existing.mastery_score = Math.max(existing.mastery_score || 0, n.mastery_score || 0)
+      existing.evidence_hits = Math.max(existing.evidence_hits || 0, n.evidence_hits || 0)
+      if (n.recommended) {
+        existing.recommended = true
+        existing.recommendation_reason = n.recommendation_reason
+        existing.recommendation_anchor_title = n.recommendation_anchor_title
+      }
     }
   }
   const edgeKey = (e: { source: string; target: string }) => `${e.source}→${e.target}`
@@ -3352,6 +3364,8 @@ function mergeGraphData(
   }
   const nodes = Array.from(nodeBySlug.values())
   const familiarCount = nodes.filter((n) => n.familiar).length
+  const masteredCount = nodes.filter((n) => (n.mastery_score || 0) > 0).length
+  const recommendedCount = nodes.filter((n) => n.recommended).length
   return {
     nodes,
     edges,
@@ -3362,6 +3376,8 @@ function mergeGraphData(
       ...incoming.meta,
       returned: nodes.length,
       familiar_count: familiarCount || undefined,
+      mastered_count: masteredCount || undefined,
+      recommended_count: recommendedCount || undefined,
     },
   }
 }
@@ -3712,6 +3728,11 @@ interface GNode {
   slug: string; title: string; type: string
   linkCount: number; pinned: boolean
   familiar: boolean
+  masteryScore: number
+  evidenceHits: number
+  recommended: boolean
+  recommendationReason: string
+  recommendationAnchorTitle: string
 }
 
 // Persistent graph state so it survives re-renders
@@ -3864,6 +3885,11 @@ function renderGraph(opts: RenderGraphOpts = {}) {
       slug: n.slug, title: n.title, type: n.page_type,
       linkCount: n.link_count || 0, pinned,
       familiar: !!n.familiar,
+      masteryScore: n.mastery_score || 0,
+      evidenceHits: n.evidence_hits || 0,
+      recommended: !!n.recommended,
+      recommendationReason: n.recommendation_reason || '',
+      recommendationAnchorTitle: n.recommendation_anchor_title || '',
     }
     nodeMap.set(n.slug, node)
     return node
@@ -4021,6 +4047,17 @@ function renderGraph(opts: RenderGraphOpts = {}) {
       g.appendChild(familiarRing)
     }
 
+    if (n.recommended) {
+      const recommendedRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
+      recommendedRing.setAttribute('r', String(r + 7))
+      recommendedRing.setAttribute('fill', 'none')
+      recommendedRing.setAttribute('stroke', '#e37318')
+      recommendedRing.setAttribute('stroke-width', '3')
+      recommendedRing.setAttribute('stroke-dasharray', '5 3')
+      recommendedRing.setAttribute('pointer-events', 'none')
+      g.appendChild(recommendedRing)
+    }
+
     // Pulse ring for selected state
     const activeRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
     activeRing.setAttribute('r', String(r + 5))
@@ -4037,6 +4074,16 @@ function renderGraph(opts: RenderGraphOpts = {}) {
     circle.setAttribute('fill', nodeColorMap[n.type] || '#8c8c8c')
     circle.setAttribute('stroke', '#fff')
     circle.setAttribute('stroke-width', '2')
+    circle.setAttribute('fill-opacity', n.masteryScore > 0 ? String(0.55 + n.masteryScore / 225) : '0.42')
+    const evidenceLabel = n.masteryScore > 0
+      ? `${n.title} · ${t('knowledgeEditor.wikiBrowser.masteryEvidence', { score: n.masteryScore, hits: n.evidenceHits })}`
+      : n.recommendationReason
+        ? `${n.title} · ${t('knowledgeEditor.wikiBrowser.recommendationAdjacent', { title: n.recommendationAnchorTitle })}`
+        : n.title
+    g.setAttribute('aria-label', evidenceLabel)
+    const tooltip = document.createElementNS('http://www.w3.org/2000/svg', 'title')
+    tooltip.textContent = evidenceLabel
+    g.appendChild(tooltip)
     // circle.setAttribute('filter', 'url(#node-shadow)')
     circle.style.transition = 'r 0.2s, stroke-width 0.2s, opacity 0.2s'
     g.appendChild(circle)
@@ -6277,6 +6324,14 @@ onUnmounted(() => {
   box-sizing: border-box;
   border: 2px solid #0052d9;
   background: transparent;
+}
+
+.legend-recommended-ring {
+  width: 13px;
+  height: 13px;
+  border: 2px dashed #e37318;
+  border-radius: 50%;
+  box-sizing: border-box;
 }
 
 .legend-divider {

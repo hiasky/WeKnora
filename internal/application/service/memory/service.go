@@ -650,6 +650,54 @@ func (s *Service) FamiliarKnowledgeIDs(ctx context.Context) []string {
 	return ids
 }
 
+// DocumentAffinityHitsForKnowledgeBase exposes the objective source-use
+// evidence used by the Wiki learning overlay. It is intentionally a concrete
+// optional capability rather than part of MemoryService so other memory
+// consumers do not need to know about Wiki-specific projections.
+func (s *Service) DocumentAffinityHitsForKnowledgeBase(ctx context.Context, kbID string) map[string]int {
+	scope, err := ResolveScope(ctx)
+	if err != nil {
+		return nil
+	}
+	rows, err := s.repo.TopDocAffinity(ctx, scope, 10000)
+	if err != nil {
+		logger.Warnf(ctx, "memory: load learning evidence failed: %v", err)
+		return nil
+	}
+	hits := make(map[string]int)
+	for _, row := range rows {
+		if row != nil && row.KnowledgeBaseID == kbID && row.KnowledgeID != "" && row.Hits > 0 {
+			hits[row.KnowledgeID] = row.Hits
+		}
+	}
+	return hits
+}
+
+// DeleteDocumentAffinitiesForKnowledgeBase permanently removes every source
+// counter for one KB in the current principal's scope, including counters
+// below the public "familiar document" threshold.
+func (s *Service) DeleteDocumentAffinitiesForKnowledgeBase(ctx context.Context, kbID string) (int, error) {
+	scope, err := ResolveScope(ctx)
+	if err != nil {
+		return 0, err
+	}
+	rows, err := s.repo.TopDocAffinity(ctx, scope, 10000)
+	if err != nil {
+		return 0, err
+	}
+	removed := 0
+	for _, row := range rows {
+		if row == nil || row.KnowledgeBaseID != kbID {
+			continue
+		}
+		if err := s.repo.DeleteDocAffinity(ctx, scope, row.ID); err != nil {
+			return removed, err
+		}
+		removed++
+	}
+	return removed, nil
+}
+
 func (s *Service) topicWasForgotten(
 	ctx context.Context, scope interfaces.MemoryScope, labels ...string,
 ) bool {
